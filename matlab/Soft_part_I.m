@@ -13,7 +13,7 @@ isMlab = 1;
 Nlength = length(Sf);
 % ===== Параметры FPGA-алгоритма =========================================
 % Подготовка формуляров
-if (any(Begs) == 0), % Превышения обнаружены?
+if (any(Begs) == 0)  % Превышения обнаружены?
     % Если нет, то заполняем пустой формуляр для очередного окна
     Results.Begs    = [];
     Results.Fins    = [];
@@ -27,14 +27,14 @@ end
 
 % ==== Предварительная обработка формуляров (объединение превышений) =
 n_iter = 0; % Процедура итерационная!
-while 1,
+while 1
     Lens = Fins-Begs; % Длины отрезков превышений
-    if (length(Lens) == 1),
+    if (length(Lens) == 1)
         break; % Если обнаружен единственный интервал, то выходим из while
     end
     Bets   = zeros(length(Lens)-1,1); % Вектор расстояний между отрезками превышений
     IsJoin = zeros(length(Lens)-1,1); % Флаг устранения промежутков
-    for i = 1:length(Lens)-1,
+    for i = 1:length(Lens)-1
         %         Bets(i) = Begs(i+1)-Fins(i); % Длины промежутков
         %         % Критерий объединения:
         %         % если расстояние между соседними отрезками меньше ширины
@@ -50,13 +50,13 @@ while 1,
         % если расстояние между соседними отрезками меньше ширины
         % обоих отрезков с запасом, то пара отрезков объединяется в один
         if ((Begs(i+1) > 0) && (Fins(i) > 0))
-            if ((Lens(i) >= Bets(i)) || (Bets(i) <= Lens(i+1))),
+            if ((Lens(i) >= Bets(i)) || (Bets(i) <= Lens(i+1)))
                 IsJoin(i) = 1; % Помечаем промежуток на удаление
             end
         end
     end
     
-    if (sum(IsJoin) == 0),
+    if (sum(IsJoin) == 0)
         break; % Если больше нечего объединять, то выходим из while
     end
     
@@ -66,7 +66,7 @@ while 1,
     Fins(I)   = []; % Удаляем спады с номерами I
     
     n_iter = n_iter+1;
-    if (n_iter > 50),
+    if (n_iter > 50)
         % Слишком много превышений, похоже - ШПС, но пока просто выходим
         warning('The number of iterations exceeds 20!');
         break;
@@ -76,12 +76,12 @@ end % Уходим на следующую итерацию
 % Оценка средней частоты и ширины очередного промежутка
 Centers = zeros(size(Begs));
 Widths  = zeros(size(Begs));
-for i = 1:length(Begs),
+for i = 1:length(Begs)
     x = Begs(i):Fins(i);
     Centers(i) = sum(x'.*Sf(x).^2)/sum(Sf(x).^2);
     %Widths(i)  = sum((x'-Centers(i)).^2.*Sf(x).^2)/sum(Sf(x).^2);
     Widths(i)  = length(x);
-    if (Widths(i) > Nlength),
+    if (Widths(i) > Nlength)
         Widths(i) = Nlength; % Идиотская формула для СКО ширины спектра!
     end
 end

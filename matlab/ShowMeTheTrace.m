@@ -3,7 +3,7 @@ function ShowMeTheTrace(Results, traces, i)
 
 global Nwindow
 
-figure(999); whitebg('k');
+figure(999); % whitebg('k');
 
 % Выбор цвета очередной трассы
 color = jet; %rand(1,3);

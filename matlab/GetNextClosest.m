@@ -24,12 +24,12 @@ Finh = Results1.Fins(k); % Конец текущей отметки
 Wdth = Results1.Widths(k); % Ширина текущей отметки
 
 % Сначала исследуем на один шаг вперёд
-for k1 = 1:Results2(1).Num,
-    if (Results2(1).isInTrace(k1) == 0),
+for k1 = 1:Results2(1).Num
+    if (Results2(1).isInTrace(k1) == 0)
         Begn1 = Results2(1).Begs(k1); % Начало текущей отметки
         Finh1 = Results2(1).Fins(k1); % Конец текущей отметки
         % Отметки перекрываются с учётом допуска (deltas(1))?
-        if (Begn*(1-deltas(1)) > Finh1) || (Finh*(1+deltas(1)) < Begn1),
+        if (Begn*(1-deltas(1)) > Finh1) || (Finh*(1+deltas(1)) < Begn1)
             % Текущая отметка с номером k1 не проходит - переходим к следующей
         else
             % Есть чем продолжить - заносим отметку в found
@@ -38,9 +38,9 @@ for k1 = 1:Results2(1).Num,
     end
 end
 
-if ~isempty(found),
+if ~isempty(found)
     i2 = 1; 
-    if length(found) == 1,
+    if length(found) == 1
         n2 = found; % Продолжить можно только одной отметкой - всё просто.
     else
         % Можно продолжить несколькими отметками, тогда всё сложнее:
@@ -51,7 +51,7 @@ if ~isempty(found),
         %прошло проверку!
         [~,n2] = min(abs(Results2(1).Centers - Results1.Centers(k)));
     end
-    if (Results2(1).Widths(n2)/Wdth >= clutterTrh),
+    if (Results2(1).Widths(n2)/Wdth >= clutterTrh)
         isClutter = 1; % Есть подозрение, что продолжаем помехой
     end
     return % Поиск закончен

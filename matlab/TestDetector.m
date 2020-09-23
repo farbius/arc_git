@@ -1,5 +1,7 @@
 % Main, v.4.0
-clc; clear all; close all
+clc
+clear
+close all
 
 %%
 % FLAGS
@@ -8,7 +10,6 @@ FULL_BANDWIDTH =  0;
 ADD_ADC_RAW    =  0;
 
 LOAD_MAT       =  1;
-
 
 isMlab = 1;
 global Fs deltas Nwindow clutterTrh Nstep
@@ -103,11 +104,11 @@ Nstep = size(Y,2);
 end % LOAD MAT
 
 t = (1:Nstep)./195.312e3;
-figure
-imagesc(t./1e-3 ,f./1e6, 20*log10(Y))
-title('frequency-time-power')
-xlabel('t, ms')
-ylabel('f, MHz')
+% figure
+% imagesc(t./1e-3 ,f./1e6, 20*log10(Y))
+% title('frequency-time-power')
+% xlabel('t, ms')
+% ylabel('f, MHz')
 
 
 
@@ -117,9 +118,9 @@ title('frequency-time-power')
 colorbar
 hold on
 
-
-figure(10)
-plot(1:4096, 20*log10(Y(:, 1:4)));
+% 
+% figure(10)
+% plot(1:4096, 20*log10(Y(:, 1:4)));
 
 
 % Формуляры для каждого окна с результатами первышений,
@@ -132,18 +133,25 @@ Results = repmat(Results, Nstep, 1);
 % Расчёт (или установка вручную) порога
 
 % Показываем на графике несколько первых спектров
-figure(100);
-plot(abs( Y(:,1)),'b'); grid on; hold on
-plot(abs( Y(:,ceil(size( Y,2)*rand))),'r'); grid on; hold on
-plot(abs( Y(:,ceil(size( Y,2)*rand))),'g'); grid on; hold on
-% Запрашиваем выставление уровня порога
-[~,trh] = ginput(1);
-% close(100);
-fprintf(1,'Current trh = %g\n', trh);
-%trh = graythresh(abs(Y(:,:)));
-fprintf(1,'Current trh = %g\n', trh);
+% figure(100);
+% plot(abs( Y(:,1)),'b'); grid on; hold on
+% plot(abs( Y(:,ceil(size( Y,2)*rand))),'r'); grid on; hold on
+% plot(abs( Y(:,ceil(size( Y,2)*rand))),'g'); grid on; hold on
+% % Запрашиваем выставление уровня порога
+% [~,trh] = ginput(1);
+% % close(100);
+% fprintf(1,'Current trh = %g\n', trh);
+% %trh = graythresh(abs(Y(:,:)));
+% fprintf(1,'Current trh = %g\n', trh);
 
-% trh = 49;
+trh = 100;
+
+test_1_Sf = zeros(4096, Nstep);
+test_2_Sf = zeros(4096, Nstep);
+
+test_1_Sf(2000:2030, :) = 500;
+test_2_Sf(1050:1064, :) = 1000;
+
 %% ==== Плисовская + I часть проц. алг-ма (первичная обработка) ==========
 for k = 0:Nstep-1
     num = k;
@@ -154,7 +162,9 @@ for k = 0:Nstep-1
     snr = 10^(-snr/20);
     n = randn(4096,1);
     nn = n + std(n);
-    Sf = Y(:, k+1); % + snr*nn;
+%     Sf = Y(:, k+1); % + snr*nn;
+    
+    Sf = test_1_Sf(:, 1) + test_2_Sf(:, 1);
     
   %% << вычисление ширины спектра  
     
@@ -167,9 +177,8 @@ for k = 0:Nstep-1
         Sf_fltd = conv(Sf,ones(Nfilt,1)/Nfilt,'same');
     end
 
-%      I = Sf_fltd > trh;
-
-     I = Sf      > trh;
+ %    I = Sf_fltd > trh;
+    I = Sf      > trh;
     
     des = zeros(size(Sf_fltd)); des(I) = 1.0;
     
@@ -261,7 +270,7 @@ end
 
 % ---- Проверка на заниженный порог --------------------------------------
 tmp = mean([Results(:).Num]); % Среднее число отдельных отметок
-if (tmp > MaxMeanPlts),
+if (tmp > MaxMeanPlts)
     xlabel('Too many plots detected, raise the threshold','Color','r');
     warning('Too many plots detected, raise the threshold');
     return
@@ -279,20 +288,20 @@ Nplots  = 0; % Общее кол-во превышений
 %     n > 0 означает, что отметка входит в трассу с номером n, 
 % а также все отметки нумеруются подряд сверху вниз и слева направа
 % (в текущей версии нумерация использ. только для удобства)
-for i = 1:Nstep, 
+for i = 1:Nstep 
     Results(i).isInTrace = -1*ones(size(Results(i).Centers)); 
     %Results(i).SerNumber = zeros(size(Results(i).Centers)); 
 end
 
 % Нумеруем подряд все отметки
-for i = 1:Nstep, 
+for i = 1:Nstep 
     %Results(i).SerNumber = [Nplots+1 : Nplots+Results(i).Num]; 
     Nplots = Nplots+Results(i).Num;
 end
 
 %  ===== Предварительный отсев бесперспективных отметок ===================
-for i = 1:Nstep-2,
-    for k = 1:Results(i).Num, % Перебор всех отметок (превышений)
+for i = 1:Nstep-2
+    for k = 1:Results(i).Num % Перебор всех отметок (превышений)
         %{
     Есть возможность продолжить текущее превышение в соотвествии
     с выбранным критерием?
@@ -305,7 +314,7 @@ for i = 1:Nstep-2,
         Widh = Fins-Begs; % Протяжённость текущей отметки
         
         % Сначала исследуем на один шаг вперёд
-        for k1 = 1:Results(i+1).Num,
+        for k1 = 1:Results(i+1).Num
             Begn1 = Results(i+1).Begs(k1); % Начало текущей отметки
             Finh1 = Results(i+1).Fins(k1); % Конец текущей отметки
             Widh1 = Finh1-Begn1; % Протяжённость текущей отметки
@@ -324,7 +333,7 @@ for i = 1:Nstep-2,
         if (Results(i).isInTrace(k) == 0), continue, end % К следующему k или i
         
         % Если не найдено ничего среди соседей - смотрим на два шага вперёд
-        for k1 = 1:Results(i+2).Num,
+        for k1 = 1:Results(i+2).Num
             Begn1 = Results(i+2).Begs(k1); % Начало текущей отметки
             Finh1 = Results(i+2).Fins(k1); % Конец текущей отметки
             Widh1 = Finh1-Begn1; % Протяжённость текущей отметки
@@ -349,9 +358,9 @@ end
 
 % ---- Только для Матлаба - выводим результат ----------------------------
 figure(999);
-for k = 1:Nstep-2,
-    for tmp = 1:Results(k).Num,
-        if Results(k).isInTrace(tmp) >= 0,
+for k = 1:Nstep-2
+    for tmp = 1:Results(k).Num
+        if Results(k).isInTrace(tmp) >= 0
             center = round(Results(k).Centers(tmp));
             wdth   = Results(k).Widths(tmp);
             % Выводим "выжившие" отметки красным цветом
@@ -397,10 +406,10 @@ Ntraces = 0; % Кол-во обнаруженных "треков"
 flag_too_many_traces = 0; % Для завершения поиска при перегрузке трассами
 
 % Перебор отметок, с которых можно начать врЕменную трассу
-for i = 1:Nstep-2,
-    for k = 1:Results(i).Num,
+for i = 1:Nstep-2
+    for k = 1:Results(i).Num
         
-        if (Results(i).isInTrace(k) == 0),
+        if (Results(i).isInTrace(k) == 0)
             
             % "Обнуляем" временную трассу
             temp_trace  = struct('Res_i',0,'Num_in_Res',0,'Center',0,'Clutter',0);
@@ -421,9 +430,9 @@ for i = 1:Nstep-2,
             
             % Теперь пытаемся продолжить врЕменную трассу
             % перебор всех неотброшенных и не входящих в другие трассы отметок
-            while(1),
+            while(1)
                 % Находим ближайшую к последней найденной
-                if ((temp_length > 1) && (isClutter == 1)),
+                if ((temp_length > 1) && (isClutter == 1))
                     isClutter_prev = isClutter;
                 else
                     isClutter_prev = 0;
@@ -431,18 +440,18 @@ for i = 1:Nstep-2,
                 i_prev = i2; k_prev = k2;
                 [tmp,k2,isClutter] = GetNextClosest(Results(i_prev),k_prev,Results(i2+1:i2+2));
                 i2 = i2+tmp;
-                if (tmp > 0), % Что-нибудь найдено?
+                if (tmp > 0) % Что-нибудь найдено?
                     %fprintf(1,'Temp trace #i %g, k = %g, k2 = %g, Results(i).isInTrace(k) = %g\n', i, k, k2, Results(i).isInTrace(k));
-                    if (Results(i2).isInTrace(k2) > 0),
+                    if (Results(i2).isInTrace(k2) > 0)
                         % Упёрлись в отметку, которая уже куда-то входит - помечаем все отметки из
                         % временной трассы -1 и уходим на поиск следующих трасс
                         % Здесь, кстати, дискутируемо!
                         Results = SetWholeTraceTo(Results,temp_trace,temp_length,-1);
                         break
                         
-                    elseif (temp_length >= Ncptrd),
+                    elseif (temp_length >= Ncptrd)
                         % Трасса подтверждена - проверяем не превышено ли допустимое кол-во трасс
-                        if (Ntraces >= MaxTracks),
+                        if (Ntraces >= MaxTracks)
                             warning('Too many traces have been detected!'); %#ok<WNTAG>
                             % Слишком много трасс - поиск закончен
                             flag_too_many_traces = 1; 
@@ -454,10 +463,10 @@ for i = 1:Nstep-2,
                             Results = SetWholeTraceTo(Results,temp_trace,temp_length,Ntraces);
                             
                             % И продолжаем трассу до куда возможно
-                            while(1),
+                            while(1)
                                 % Находим ближайшую к последней найденной
                                 isClutter_prev = isClutter; % Задержка признака на один шаг
-                                if ((isClutter == 1)),
+                                if ((isClutter == 1))
                                     % Последняя отметка пришла с признаком "помеха" - нужно её перепрыгнуть
                                     i_prev = i2; % traces(tmp-1,Ntraces).Res_i; % Просто i2-1 нельзя - можем сорвать слежение
                                     k_prev = k2; %traces(tmp,Ntraces).Num_in_Res; % Та же фигня
@@ -467,7 +476,7 @@ for i = 1:Nstep-2,
                                 end
                                 [tmp,k2,isClutter] = GetNextClosest(Results(i_prev),k_prev,Results(i2+1:i2+2));
                                 i2 = i2+tmp; % На сколько шагов смещаемся (1 или 2, 2 или 3, если предыдущий был помехой)
-                                if (tmp > 0),
+                                if (tmp > 0)
                                     % Ищем первое свободное (нулевое) место
                                     tmp = find(~[traces(:,Ntraces).Res_i],1); % Удлиняем трассу
                                     traces(tmp,Ntraces).Res_i       = i2;
@@ -573,7 +582,7 @@ end
 % Во-первых, проверяем число обнаруженных треков, если их слишком много,
 % то явно был неверный выбор порога, либо слишком малое ОСШ для
 % распознования. Такое эпизод - отбраковывается.
-if (Ntraces > MaxTraces),
+if (Ntraces > MaxTraces)
     fprintf(1,'===== Final Result ====================================\n');
     fprintf(1,'Too many traces: unclassified.\n');
     return
@@ -584,7 +593,7 @@ TracksInfo = struct('Fmean',0,'dFmax',0,'Length',0,'Curvature',0,'MSE',0,'isBrea
 TracksInfo = repmat(TracksInfo, Ntraces);
 Lengths    = zeros(Ntraces, 1); % Длины трасс
 
-for n_trk = 1:Ntraces,
+for n_trk = 1:Ntraces
     the_last = find(~[traces(:,n_trk).Res_i],1)-1; % Длина текущей трассы
     Lengths(n_trk) = the_last;
     
@@ -592,7 +601,7 @@ for n_trk = 1:Ntraces,
     tmp      = [traces(1:the_last,n_trk).Num_in_Res];
     wtdhs    = zeros(size(x));
     
-    for i = 1:length(x);
+    for i = 1:length(x)
         wtdhs(i) = Results(x(i)).Types(tmp(i)); % Типы отметок по широкополосности
     end
     
@@ -618,7 +627,7 @@ for n_trk = 1:Ntraces,
     % Проверка на наличие "изломов" треков
     trh_brk = mean(err)+3.5*std(err); % Порог обнаружения изломов
     
-    if ~isempty(find(err > trh_brk,1)),
+    if ~isempty(find(err > trh_brk,1))
         % Трек с изломом - яркий классификационный признак
         TracksInfo(n_trk).isBreak = 1; % Обнаружен излом трека
         [~,i_max] = max(err); % Засекаем положение излома трека
@@ -646,14 +655,14 @@ for n_trk = 1:Ntraces
     end
 end
 
-% ---- Собственно распознование и вывод результатов ----------------------
-if (Ntraces == 1),
-    if (TracksInfo(1).dFmax < 10),
+% ---- Собственно распознавание и вывод результатов ----------------------
+if (Ntraces == 1)
+    if (TracksInfo(1).dFmax < 10)
         % Что-то узкополосное (возможно "Мультанова 6F", но увы)
         Type_of_radar = 'Unclassified';
         Prob_of_recogn = 0.0;
     else
-        if (TracksInfo(1).isBreak == 1),
+        if (TracksInfo(1).isBreak == 1)
             Type_of_radar = 'Ramera-222';
             Prob_of_recogn = TracksInfo(n_trk).dFmax/(Nwindow/8);
         else
@@ -668,14 +677,14 @@ if (Ntraces == 1),
     end
 else
     % Если треков больше, то главный вопрос насколько они перекрываются
-    if (IntersectEnough(traces(:,1:Ntraces),Lengths)),
+    if (IntersectEnough(traces(:,1:Ntraces),Lengths))
         % Если они достаточно длинные и хорошо перекрываются - то это,
         % скорее всего "Мульта-CD"
         Type_of_radar = 'Multa CD';
         tmp = [TracksInfo(:).Length];
         Prob_of_recogn = min(tmp(1:2))/max(tmp(1:2));
     else
-        if ((Ntraces == 2) || (Ntraces == 3)),
+        if ((Ntraces == 2) || (Ntraces == 3))
             % Если треки не перекрываются и треков два или три, то это,
             % скорее всего "Рамера", но зависит от того как далеко треки
             % друг от друга
