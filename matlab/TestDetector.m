@@ -8,6 +8,7 @@ close all
 ONE_SPECTRUM   =  0;
 FULL_BANDWIDTH =  0;
 ADD_ADC_RAW    =  0;
+INPUT_GEN      =  1;
 
 LOAD_MAT       =  1;
 
@@ -34,13 +35,14 @@ Nlin = 3; %| Кол-во отметок, по которым корректируется помеховая отметка
 % позволяет оптимально принимать решение о наличии ШП-сигнала при
 % обнаружении "россыпи" узкополосных отметок (это сейчас делает процедура
 % Soft_part_I, но по эвристическому алгоритму)
-fileID = fopen('fft_2_dma.bin');
+fileID = fopen('fft_1_dma.bin');
 A = fread(fileID, 'uint32');
 fclose(fileID);
 C = zeros(length(A), 1);
 
 f = (1:4096).*400e6 / 4096;
 
+if INPUT_GEN == 0
 CC = dec2hex(A);
 if LOAD_MAT == 0
 
@@ -103,6 +105,70 @@ Nstep = size(Y,2);
 
 end % LOAD MAT
 
+
+else % INPUT_GEN
+%%
+% signal generator
+
+    tau     = 8e-6; % pulse width
+    Tp      = 2e-3;  % pulse repetition
+    dev     = 100e6; % deviation
+    F1      = 50e6;  % start frequency
+    F2      = 150e6; % stop frequency
+    Ta      = 40e-3; % acquisition interval
+    
+    Ns      = ceil(tau*Fs)
+    ts      = (0:Ns-1)./Fs;
+    b       = (F2 - F1) / tau;
+%      s       = cos(2*pi*(F1.*ts + (b/2).*ts.^2));
+    s       = chirp(ts,F1,tau,F2);
+    sf      = abs(fft(s, Nwindow));
+    sf      = sf(1:4096);
+    
+    figure
+    plot(f./1e6, sf, '.-b')
+    title('single pulse: freq domain')
+    xlabel('f, MHz');
+    grid on
+    
+    Ntrain = Tp*Fs;
+    Nacquis= ceil(Ta/Tp);
+    Nrand  = ceil(1000*rand(1));
+    ys     = repmat([s zeros(1, Ntrain-Ns)], [1 Nacquis]);
+    y      = [zeros(1, Nrand) ys];
+    
+    figure
+    plot([0:length(y)-1]./Fs./1e-3, y, '.-r')
+    title('acquisition interval: time domain ')
+    ylim([-1.5 1.5])
+    xlabel('t, ms')
+    grid on
+    
+    Nstep = ceil(length(y)/ Nwindow);
+    Y = zeros(Nwindow/2, Nstep);
+    for i = 0:Nstep-2
+        
+        sF        = abs(fft(y(i*Nwindow + 1 : (i+ 1)*Nwindow)));
+        Y(:, i+1) = sF(1:Nwindow/2);
+        
+    end
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+end % INPUT_GEN
+
+
+
+
+
+
 t = (1:Nstep)./195.312e3;
 % figure
 % imagesc(t./1e-3 ,f./1e6, 20*log10(Y))
@@ -113,7 +179,7 @@ t = (1:Nstep)./195.312e3;
 
 
 figure(999)
-imagesc(20*log10(Y))
+imagesc((Y))
 title('frequency-time-power')
 colorbar
 hold on
@@ -158,13 +224,13 @@ for k = 0:Nstep-1
     
     % ---- FPGA-часть алгоритма -----------------------------------------
     % [f,Sf,Sf_fltd,trh,des,Begs,Fins] = FPGA_part(samples, Nwindow, trh, TrhManual);
-    snr = -20;
-    snr = 10^(-snr/20);
-    n = randn(4096,1);
-    nn = n + std(n);
-%     Sf = Y(:, k+1); % + snr*nn;
+%     snr = -20;
+%     snr = 10^(-snr/20);
+%     n = randn(4096,1);
+%     nn = n + std(n);
+     Sf = Y(:, k+1); % + snr*nn;
     
-    Sf = test_1_Sf(:, 1) + test_2_Sf(:, 1);
+%    Sf = test_1_Sf(:, 1) + test_2_Sf(:, 1);
     
   %% << вычисление ширины спектра  
     
