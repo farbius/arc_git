@@ -110,17 +110,15 @@ else % INPUT_GEN
 %%
 % signal generator
 
-    tau     = 8e-6; % pulse width
+    tau     = 1000e-6; % pulse width
     Tp      = 2e-3;  % pulse repetition
-    dev     = 100e6; % deviation
     F1      = 50e6;  % start frequency
     F2      = 150e6; % stop frequency
-    Ta      = 40e-3; % acquisition interval
+    Ta      = 8e-3; % acquisition interval
     
     Ns      = ceil(tau*Fs)
     ts      = (0:Ns-1)./Fs;
     b       = (F2 - F1) / tau;
-%      s       = cos(2*pi*(F1.*ts + (b/2).*ts.^2));
     s       = chirp(ts,F1,tau,F2);
     sf      = abs(fft(s, Nwindow));
     sf      = sf(1:4096);
@@ -166,18 +164,6 @@ end % INPUT_GEN
 
 
 
-
-
-
-t = (1:Nstep)./195.312e3;
-% figure
-% imagesc(t./1e-3 ,f./1e6, 20*log10(Y))
-% title('frequency-time-power')
-% xlabel('t, ms')
-% ylabel('f, MHz')
-
-
-
 figure(999)
 imagesc((Y))
 title('frequency-time-power')
@@ -212,12 +198,7 @@ Results = repmat(Results, Nstep, 1);
 
 trh = 100;
 
-test_1_Sf = zeros(4096, Nstep);
-test_2_Sf = zeros(4096, Nstep);
-
-test_1_Sf(2000:2030, :) = 500;
-test_2_Sf(1050:1064, :) = 1000;
-
+Centras = zeros(Nstep, 1);
 %% ==== Плисовская + I часть проц. алг-ма (первичная обработка) ==========
 for k = 0:Nstep-1
     num = k;
@@ -230,7 +211,6 @@ for k = 0:Nstep-1
 %     nn = n + std(n);
      Sf = Y(:, k+1); % + snr*nn;
     
-%    Sf = test_1_Sf(:, 1) + test_2_Sf(:, 1);
     
   %% << вычисление ширины спектра  
     
@@ -255,26 +235,27 @@ for k = 0:Nstep-1
     I10 = find(dI > 0); % Ищем все "фронты" (начала отрезков с превышен.)
     I01 = find(dI < 0); % Ищем все "спады" (концы отрезков с превыш.)
 
-    if (isempty(I10) && isempty(I01)),
+    if (isempty(I10) && isempty(I01))
             % Ничего не обнаружено, выдаём пустые границы
         Begs = [];
         Fins = [];
-        return
+%         break
     end
     
+    if(numel(I10) > 0)
     % Защита от ситуации, когда есть один фронт, но нет спада и наоборот
-    if (length(I10) == length(I01)+1),
+    if (length(I10) == length(I01)+1)
         % В конце спектра есть фронт, но нет спада - добавляем
         I01 = [I01; Nwindow/2];
-    elseif (length(I10)+1 == length(I01)),
+    elseif (length(I10)+1 == length(I01))
         % В начале спектра есть спад, но нет фронта
         I10 = [1; I10];
-    elseif (abs(length(I10)-length(I01)) > 1),
+    elseif (abs(length(I10)-length(I01)) > 1)
         % Такого вообще-то не должно быть, но на всякий случай
         error('Alghoritm error: diff of lengthes is more than 2!');
     else 
         % Длины векторов одинаковы
-        if (I10(1) > I01(1)),
+        if (I10(1) > I01(1))
             if (I10(end) > I01(end))
                 % Произошёл "сдвиг" (началось спадом, закончилось фронтом)
                 I10 = [1; I10];
@@ -285,6 +266,8 @@ for k = 0:Nstep-1
             end
         end
     end
+    
+    end % numel
 
     if numel(I10) > 0 % Вообще что-нибудь обнаружено?
         % Все превышения целиком находятся в текущем отрезке
@@ -317,14 +300,18 @@ for k = 0:Nstep-1
     %% ---- I часть процессорного алгоритма ------------------------------
     % Объединение превышений и предварительная оценка ширины спектра объединённых превышений
     Results(k+isMlab) = Soft_part_I(Sf,Begs,Fins,Width);
-
-     % ---- Выводим рез-ты работы первых двух частей ---------------------
-    figure(999);
-    for tmp = 1:Results(k+isMlab).Num
-        center = round(Results(k+isMlab).Centers(tmp));
-        wdth   = Results(k+isMlab).Widths(tmp);
-        plot([num+1 num+1],[Results(k+isMlab).Begs(tmp) Results(k+isMlab).Fins(tmp)],'g','LineWidth',2);
+    if numel(Results(k+isMlab).Centers) > 0
+    Centras(k+isMlab) = Results(k+isMlab).Centers(1);
+    else
+    Centras(k+isMlab) = NaN;    
     end
+     % ---- Выводим рез-ты работы первых двух частей ---------------------
+%     figure(999);
+%     for tmp = 1:Results(k+isMlab).Num
+%         center = round(Results(k+isMlab).Centers(tmp));
+%         wdth   = Results(k+isMlab).Widths(tmp);
+%         plot([num+1 num+1],[Results(k+isMlab).Begs(tmp) Results(k+isMlab).Fins(tmp)],'g','LineWidth',2);
+%     end
     
 end
 
@@ -332,8 +319,11 @@ end
 
 
 
+figure
+plot(Centras, '.-b')
+grid on
 
-
+return
 % ---- Проверка на заниженный порог --------------------------------------
 tmp = mean([Results(:).Num]); % Среднее число отдельных отметок
 if (tmp > MaxMeanPlts)
