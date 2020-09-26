@@ -8,7 +8,7 @@ close all
 ONE_SPECTRUM   =  0;
 FULL_BANDWIDTH =  0;
 ADD_ADC_RAW    =  0;
-INPUT_GEN      =  1;
+INPUT_GEN      =  0;
 
 LOAD_MAT       =  1;
 
@@ -35,14 +35,14 @@ Nlin = 3; %| Кол-во отметок, по которым корректируется помеховая отметка
 % позволяет оптимально принимать решение о наличии ШП-сигнала при
 % обнаружении "россыпи" узкополосных отметок (это сейчас делает процедура
 % Soft_part_I, но по эвристическому алгоритму)
-fileID = fopen('fft_1_dma.bin');
+fileID = fopen('fft_6_dma.bin');
 A = fread(fileID, 'uint32');
 fclose(fileID);
 C = zeros(length(A), 1);
 
 f = (1:4096).*400e6 / 4096;
 
-if INPUT_GEN == 0
+% if INPUT_GEN == 0
 CC = dec2hex(A);
 if LOAD_MAT == 0
 
@@ -106,66 +106,47 @@ Nstep = size(Y,2);
 end % LOAD MAT
 
 
-else % INPUT_GEN
+% else % INPUT_GEN
 %%
 % signal generator
 
-    tau     = 1000e-6; % pulse width
-    Tp      = 2e-3;  % pulse repetition
-    F1      = 50e6;  % start frequency
-    F2      = 150e6; % stop frequency
-    Ta      = 8e-3; % acquisition interval
-    
-    Ns      = ceil(tau*Fs)
+    tau     = 245.76e-6;   % period
+    F2      = 237e6;    % start frequency
+    F1      = 73.275e6;     % stop frequency 
+    Ns      = ceil(tau*Fs);
     ts      = (0:Ns-1)./Fs;
-    b       = (F2 - F1) / tau;
-    s       = chirp(ts,F1,tau,F2);
-    sf      = abs(fft(s, Nwindow));
-    sf      = sf(1:4096);
     
-    figure
-    plot(f./1e6, sf, '.-b')
-    title('single pulse: freq domain')
-    xlabel('f, MHz');
-    grid on
-    
-    Ntrain = Tp*Fs;
-    Nacquis= ceil(Ta/Tp);
-    Nrand  = ceil(1000*rand(1));
-    ys     = repmat([s zeros(1, Ntrain-Ns)], [1 Nacquis]);
-    y      = [zeros(1, Nrand) ys];
-    
-    figure
-    plot([0:length(y)-1]./Fs./1e-3, y, '.-r')
-    title('acquisition interval: time domain ')
-    ylim([-1.5 1.5])
-    xlabel('t, ms')
-    grid on
-    
-    Nstep = ceil(length(y)/ Nwindow);
-    Y = zeros(Nwindow/2, Nstep);
+% quadratic linear
+    s       = chirp(ts,F1,tau,F2,'linear'); % convex concave ,[],'concave'
+           
+   pspectrum(s,Fs,'spectrogram','FrequencyLimits',[0 400e6],'TimeResolution',1e-6);
+ 
+        s = repmat(s, [1 1000]);
+   
+%     snr = -20;
+%     snr = 10^(-snr/20);
+%       n = randn(length(s),1);
+%      nn = n + std(n);
+%       s = s + snr*nn;
+
+
+    Nstep = ceil(length(s)/ Nwindow);
+    Yg = zeros(Nwindow/2, Nstep);
     for i = 0:Nstep-2
         
-        sF        = abs(fft(y(i*Nwindow + 1 : (i+ 1)*Nwindow)));
-        Y(:, i+1) = sF(1:Nwindow/2);
+        sF        = abs(fft(s(i*Nwindow + 1 : (i+ 1)*Nwindow)));
+        Yg(:, i+1) = sF(1:Nwindow/2);
         
-    end
+    end  
     
-    
-    
-    
-    
-    
-    
-    
-    
-    
-end % INPUT_GEN
+    Nstep = 8192;
+    Yg = Yg(:, 17:Nstep+16);
+%  end % INPUT_GEN
 
 
 
 figure(999)
-imagesc((Y))
+imagesc(Yg)
 title('frequency-time-power')
 colorbar
 hold on
@@ -196,19 +177,16 @@ Results = repmat(Results, Nstep, 1);
 % %trh = graythresh(abs(Y(:,:)));
 % fprintf(1,'Current trh = %g\n', trh);
 
-trh = 100;
+trh = 10;
 
 Centras = zeros(Nstep, 1);
 %% ==== Плисовская + I часть проц. алг-ма (первичная обработка) ==========
-for k = 0:Nstep-1
+for k = 0:Nstep-1 %
     num = k;
     
     % ---- FPGA-часть алгоритма -----------------------------------------
     % [f,Sf,Sf_fltd,trh,des,Begs,Fins] = FPGA_part(samples, Nwindow, trh, TrhManual);
-%     snr = -20;
-%     snr = 10^(-snr/20);
-%     n = randn(4096,1);
-%     nn = n + std(n);
+
      Sf = Y(:, k+1); % + snr*nn;
     
     
@@ -306,22 +284,36 @@ for k = 0:Nstep-1
     Centras(k+isMlab) = NaN;    
     end
      % ---- Выводим рез-ты работы первых двух частей ---------------------
-%     figure(999);
-%     for tmp = 1:Results(k+isMlab).Num
-%         center = round(Results(k+isMlab).Centers(tmp));
-%         wdth   = Results(k+isMlab).Widths(tmp);
-%         plot([num+1 num+1],[Results(k+isMlab).Begs(tmp) Results(k+isMlab).Fins(tmp)],'g','LineWidth',2);
-%     end
+    figure(999);
+    for tmp = 1:Results(k+isMlab).Num
+        center = round(Results(k+isMlab).Centers(tmp));
+        wdth   = Results(k+isMlab).Widths(tmp);
+        plot([num+1 num+1],[Results(k+isMlab).Begs(tmp) Results(k+isMlab).Fins(tmp)],'g','LineWidth',2);
+    end
     
 end
 
 
 
+Centrs(:) = Centras(9:31);
+% Centrs(:) = Centras(2:23);
+x = 1:length(Centrs);
 
+
+
+c = polyfit(x,Centrs,1);
+disp(['Equation is y = ' num2str(c(1)) '*x + ' num2str(c(2))])
+
+y_est = polyval(c,x);
 
 figure
-plot(Centras, '.-b')
+plot(x, Centrs, '.-b', x,y_est,'.-r')
+legend('center freq', 'fitted line')
+xlabel('Nstep')
+ylabel('Bins')
 grid on
+
+disp(['Error is ' num2str(sum((y_est-Centrs).^2)/length(x))]);
 
 return
 % ---- Проверка на заниженный порог --------------------------------------
