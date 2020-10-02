@@ -8,7 +8,7 @@ close all
 ONE_SPECTRUM   =  0;
 FULL_BANDWIDTH =  0;
 ADD_ADC_RAW    =  0;
-INPUT_GEN      =  0;
+INPUT_GEN      =  1;
 
 LOAD_MAT       =  1;
 
@@ -42,7 +42,7 @@ C = zeros(length(A), 1);
 
 f = (1:4096).*400e6 / 4096;
 
-% if INPUT_GEN == 0
+if INPUT_GEN == 0
 CC = dec2hex(A);
 if LOAD_MAT == 0
 
@@ -106,12 +106,12 @@ Nstep = size(Y,2);
 end % LOAD MAT
 
 
-% else % INPUT_GEN
+else % INPUT_GEN
 %%
 % signal generator
 
-    tau     = 245.76e-6;   % period
-    F2      = 237e6;    % start frequency
+    tau     = 245.76e-6;%245.76e-6;   % period
+    F2      = 74e6; % 237e6;    % start frequency
     F1      = 73.275e6;     % stop frequency 
     Ns      = ceil(tau*Fs);
     ts      = (0:Ns-1)./Fs;
@@ -119,9 +119,9 @@ end % LOAD MAT
 % quadratic linear
     s       = chirp(ts,F1,tau,F2,'linear'); % convex concave ,[],'concave'
            
-   pspectrum(s,Fs,'spectrogram','FrequencyLimits',[0 400e6],'TimeResolution',1e-6);
+%    pspectrum(s,Fs,'spectrogram','FrequencyLimits',[0 400e6],'TimeResolution',1e-6);
  
-        s = repmat(s, [1 1000]);
+    s = repmat(s, [1 10]);
    
 %     snr = -20;
 %     snr = 10^(-snr/20);
@@ -131,22 +131,22 @@ end % LOAD MAT
 
 
     Nstep = ceil(length(s)/ Nwindow);
-    Yg = zeros(Nwindow/2, Nstep);
+    Y = zeros(Nwindow/2, Nstep);
     for i = 0:Nstep-2
         
         sF        = abs(fft(s(i*Nwindow + 1 : (i+ 1)*Nwindow)));
-        Yg(:, i+1) = sF(1:Nwindow/2);
+        Y(:, i+1) = sF(1:Nwindow/2);
         
     end  
     
-    Nstep = 8192;
-    Yg = Yg(:, 17:Nstep+16);
-%  end % INPUT_GEN
+%     Nstep = 8192;
+%     Y = Y(:, 17:Nstep+16);
+end % INPUT_GEN
 
 
 
 figure(999)
-imagesc(Yg)
+imagesc(Y)
 title('frequency-time-power')
 colorbar
 hold on
@@ -177,7 +177,7 @@ Results = repmat(Results, Nstep, 1);
 % %trh = graythresh(abs(Y(:,:)));
 % fprintf(1,'Current trh = %g\n', trh);
 
-trh = 10;
+trh = 200;
 
 Centras = zeros(Nstep, 1);
 %% ==== Плисовская + I часть проц. алг-ма (первичная обработка) ==========
@@ -295,27 +295,27 @@ end
 
 
 
-Centrs(:) = Centras(9:31);
-% Centrs(:) = Centras(2:23);
-x = 1:length(Centrs);
+% Centrs(:) = Centras(9:31);
+% % Centrs(:) = Centras(2:23);
+% x = 1:length(Centrs);
+% 
+% 
+% 
+% c = polyfit(x,Centrs,1);
+% disp(['Equation is y = ' num2str(c(1)) '*x + ' num2str(c(2))])
+% 
+% y_est = polyval(c,x);
+% 
+% figure
+% plot(x, Centrs, '.-b', x,y_est,'.-r')
+% legend('center freq', 'fitted line')
+% xlabel('Nstep')
+% ylabel('Bins')
+% grid on
+% 
+% disp(['Error is ' num2str(sum((y_est-Centrs).^2)/length(x))]);
 
-
-
-c = polyfit(x,Centrs,1);
-disp(['Equation is y = ' num2str(c(1)) '*x + ' num2str(c(2))])
-
-y_est = polyval(c,x);
-
-figure
-plot(x, Centrs, '.-b', x,y_est,'.-r')
-legend('center freq', 'fitted line')
-xlabel('Nstep')
-ylabel('Bins')
-grid on
-
-disp(['Error is ' num2str(sum((y_est-Centrs).^2)/length(x))]);
-
-return
+% return
 % ---- Проверка на заниженный порог --------------------------------------
 tmp = mean([Results(:).Num]); % Среднее число отдельных отметок
 if (tmp > MaxMeanPlts)
@@ -327,25 +327,25 @@ end
 %% ==== Поиск и построение трасс  ========================================
 deltas = [delta1 delta2]; % "Зоны" захвата и сопровождения (см. далее)
 
-Nplots  = 0; % Общее кол-во превышений
+% Nplots  = 0; % Общее кол-во превышений
 
-% Для всех отметок создаётся дополнительные поля isInTrace и SerNumber, 
-% при этом: 
-%    -1 означает, что отметка бесперспективна (исходно для всех);
-%     0 означает, что никуда не входит;
-%     n > 0 означает, что отметка входит в трассу с номером n, 
-% а также все отметки нумеруются подряд сверху вниз и слева направа
-% (в текущей версии нумерация использ. только для удобства)
+% % % Для всех отметок создаётся дополнительные поля isInTrace и SerNumber, 
+% % % при этом: 
+% % %    -1 означает, что отметка бесперспективна (исходно для всех);
+% % %     0 означает, что никуда не входит;
+% % %     n > 0 означает, что отметка входит в трассу с номером n, 
+% % % а также все отметки нумеруются подряд сверху вниз и слева направа
+% % % (в текущей версии нумерация использ. только для удобства)
 for i = 1:Nstep 
     Results(i).isInTrace = -1*ones(size(Results(i).Centers)); 
     %Results(i).SerNumber = zeros(size(Results(i).Centers)); 
 end
 
-% Нумеруем подряд все отметки
-for i = 1:Nstep 
-    %Results(i).SerNumber = [Nplots+1 : Nplots+Results(i).Num]; 
-    Nplots = Nplots+Results(i).Num;
-end
+% % Нумеруем подряд все отметки
+% for i = 1:Nstep 
+%     %Results(i).SerNumber = [Nplots+1 : Nplots+Results(i).Num]; 
+%     Nplots = Nplots+Results(i).Num;
+% end
 
 %  ===== Предварительный отсев бесперспективных отметок ===================
 for i = 1:Nstep-2
@@ -359,7 +359,7 @@ for i = 1:Nstep-2
         %}
         Begn = Results(i).Begs(k); % Начало текущей отметки
         Finh = Results(i).Fins(k); % Конец текущей отметки
-        Widh = Fins-Begs; % Протяжённость текущей отметки
+        Widh = Results(i).Widths(k); % Протяжённость текущей отметки
         
         % Сначала исследуем на один шаг вперёд
         for k1 = 1:Results(i+1).Num
@@ -369,7 +369,7 @@ for i = 1:Nstep-2
             % Отметки перекрываются с учётом допуска (deltas(1))?
             % Прим.: допуск, вообще говоря, должен считаться по размеру БПФ
             % и текущему ОСШ
-            if (Begn*(1-deltas(1)) > Finh1) || (Finh*(1+deltas(1)) < Begn1),
+            if (Begn*(1-deltas(1)) > Finh1) || (Finh*(1+deltas(1)) < Begn1)
                 % Текущая отметка с номером k1 не проходит - переходим к следующей
                 continue
             else
@@ -386,7 +386,7 @@ for i = 1:Nstep-2
             Finh1 = Results(i+2).Fins(k1); % Конец текущей отметки
             Widh1 = Finh1-Begn1; % Протяжённость текущей отметки
             % Отметки перекрываются с учётом допуска (deltas(2))?
-            if (Begn*(1-deltas(2)) > Finh1) || (Finh*(1+deltas(2)) < Begn1),
+            if (Begn*(1-deltas(2)) > Finh1) || (Finh*(1+deltas(2)) < Begn1)
                 % Текущая отметка с номером k1 не проходит - переходим к следующей
                 continue
             else
@@ -683,7 +683,7 @@ for n_trk = 1:Ntraces
     
 end
 
-% ---- Только для Матлаба - выводим результат распознования --------------
+% ---- Только для Матлаба - выводим результат распознавания --------------
 Types = {'Non-radar signal','Iskra','MultaNova','Multa-CD',...
     'MultaNova6F','Ramera-222','Stalker 34G'};
 fprintf(1,'===== Final Result ====================================\n');
