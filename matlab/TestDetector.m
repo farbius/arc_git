@@ -8,7 +8,7 @@ close all
 ONE_SPECTRUM   =  0;
 FULL_BANDWIDTH =  0;
 ADD_ADC_RAW    =  0;
-INPUT_GEN      =  1;
+INPUT_GEN      =  0;
 
 LOAD_MAT       =  1;
 
@@ -23,8 +23,8 @@ Width       = 40;    %| Порог принятия решения о "широкополосности" (в точках БП
 TrhManual   = 1;     %| Ручная установка порога (1 - да, 0 - автомат)
 MaxMeanPlts = 7.0;   %| Максимальное среднее кол-во отдельных превышений
 delta1      = 0.25;  %| Максимальное разрешённое смещение отметок на 1 шаг
-delta2      = 0.5;   %| Максимальное разрешённое смещение отметок на 2 шага
-Ncptrd      = 30;    %| Минимальное кол-во отметок для завязки трассы
+delta2      = 0.75;   %| Максимальное разрешённое смещение отметок на 2 шага
+Ncptrd      = 20;    %| Минимальное кол-во отметок для завязки трассы
 MaxTracks   = 30;    %| Максимальное кол-во трасс (во избежания перегрузки)
 MaxTraces   = 5;     %| Максимальное кол-во трасс при распозновании
 clutterTrh  = 3.0;   %| См. процедуру GetNextClosest
@@ -96,13 +96,10 @@ end % for
 
 save('Sf.mat','Y');
 
-else
-    
+else  
 load('Sf.mat');
-
-Nstep = size(Y,2);
-
-
+% Nstep = size(Y,2);
+Nstep = 200;
 end % LOAD MAT
 
 
@@ -111,50 +108,36 @@ else % INPUT_GEN
 % signal generator
 
     tau     = 245.76e-6;%245.76e-6;   % period
-    F2      = 74e6; % 237e6;    % start frequency
+    F2      = 237e6; % 237e6;    % start frequency
     F1      = 73.275e6;     % stop frequency 
+    dev     = F2 - F1
     Ns      = ceil(tau*Fs);
     ts      = (0:Ns-1)./Fs;
     
 % quadratic linear
-    s       = chirp(ts,F1,tau,F2,'linear'); % convex concave ,[],'concave'
-           
-%    pspectrum(s,Fs,'spectrogram','FrequencyLimits',[0 400e6],'TimeResolution',1e-6);
- 
-    s = repmat(s, [1 10]);
+    s       = chirp(ts,F1,tau,F2,'linear'); % convex concave ,[],'concave'       
+    s       = repmat(s, [1 10]);
    
 %     snr = -20;
 %     snr = 10^(-snr/20);
 %       n = randn(length(s),1);
 %      nn = n + std(n);
 %       s = s + snr*nn;
-
-
     Nstep = ceil(length(s)/ Nwindow);
     Y = zeros(Nwindow/2, Nstep);
     for i = 0:Nstep-2
-        
         sF        = abs(fft(s(i*Nwindow + 1 : (i+ 1)*Nwindow)));
         Y(:, i+1) = sF(1:Nwindow/2);
-        
     end  
-    
-%     Nstep = 8192;
-%     Y = Y(:, 17:Nstep+16);
 end % INPUT_GEN
 
 
 
 figure(999)
-imagesc(Y)
+imagesc(Y(:, 1:Nstep))
 title('frequency-time-power')
 colorbar
 hold on
-
-% 
-% figure(10)
-% plot(1:4096, 20*log10(Y(:, 1:4)));
-
 
 % Формуляры для каждого окна с результатами первышений,
 % объединений и классификации
@@ -177,7 +160,7 @@ Results = repmat(Results, Nstep, 1);
 % %trh = graythresh(abs(Y(:,:)));
 % fprintf(1,'Current trh = %g\n', trh);
 
-trh = 200;
+trh =2;
 
 Centras = zeros(Nstep, 1);
 %% ==== Плисовская + I часть проц. алг-ма (первичная обработка) ==========
@@ -186,10 +169,12 @@ for k = 0:Nstep-1 %
     
     % ---- FPGA-часть алгоритма -----------------------------------------
     % [f,Sf,Sf_fltd,trh,des,Begs,Fins] = FPGA_part(samples, Nwindow, trh, TrhManual);
-
-     Sf = Y(:, k+1); % + snr*nn;
-    
-    
+%     snr = 0;
+%     snr = 10^(-snr/20);
+%       n = randn(4096,1);
+%      nn = n + std(n);
+     Sf = Y(:, k+1); %+ snr*nn;
+     
   %% << вычисление ширины спектра  
     
     % Сглаживаем спектр, ибо слишком много "шерсти" в записях
@@ -200,7 +185,7 @@ for k = 0:Nstep-1 %
         Nfilt = log2(Nwindow)-4; % Похоже, такой порядок оптимален
         Sf_fltd = conv(Sf,ones(Nfilt,1)/Nfilt,'same');
     end
-
+    
  %    I = Sf_fltd > trh;
     I = Sf      > trh;
     
@@ -293,29 +278,8 @@ for k = 0:Nstep-1 %
     
 end
 
+save('centr.mat', 'Centras')
 
-
-% Centrs(:) = Centras(9:31);
-% % Centrs(:) = Centras(2:23);
-% x = 1:length(Centrs);
-% 
-% 
-% 
-% c = polyfit(x,Centrs,1);
-% disp(['Equation is y = ' num2str(c(1)) '*x + ' num2str(c(2))])
-% 
-% y_est = polyval(c,x);
-% 
-% figure
-% plot(x, Centrs, '.-b', x,y_est,'.-r')
-% legend('center freq', 'fitted line')
-% xlabel('Nstep')
-% ylabel('Bins')
-% grid on
-% 
-% disp(['Error is ' num2str(sum((y_est-Centrs).^2)/length(x))]);
-
-% return
 % ---- Проверка на заниженный порог --------------------------------------
 tmp = mean([Results(:).Num]); % Среднее число отдельных отметок
 if (tmp > MaxMeanPlts)
@@ -327,9 +291,7 @@ end
 %% ==== Поиск и построение трасс  ========================================
 deltas = [delta1 delta2]; % "Зоны" захвата и сопровождения (см. далее)
 
-% Nplots  = 0; % Общее кол-во превышений
-
-% % % Для всех отметок создаётся дополнительные поля isInTrace и SerNumber, 
+% % % Для всех отметок создаётся дополнительные поля isInTrace, 
 % % % при этом: 
 % % %    -1 означает, что отметка бесперспективна (исходно для всех);
 % % %     0 означает, что никуда не входит;
@@ -338,14 +300,8 @@ deltas = [delta1 delta2]; % "Зоны" захвата и сопровождения (см. далее)
 % % % (в текущей версии нумерация использ. только для удобства)
 for i = 1:Nstep 
     Results(i).isInTrace = -1*ones(size(Results(i).Centers)); 
-    %Results(i).SerNumber = zeros(size(Results(i).Centers)); 
 end
 
-% % Нумеруем подряд все отметки
-% for i = 1:Nstep 
-%     %Results(i).SerNumber = [Nplots+1 : Nplots+Results(i).Num]; 
-%     Nplots = Nplots+Results(i).Num;
-% end
 
 %  ===== Предварительный отсев бесперспективных отметок ===================
 for i = 1:Nstep-2
@@ -533,7 +489,7 @@ for i = 1:Nstep-2
                                     traces(tmp,Ntraces).Clutter     = isClutter; % Признак "помеха"
                                     Results(i2).isInTrace(k2)       = Ntraces;
                                     % Подправляем предыдущую отметку, если она пришла с признаком "помеха", иначе трасса может уйти в сторону 
-                                    if (isClutter),
+                                    if (isClutter)
                                         x = [traces(tmp-Nlin : tmp-1, Ntraces).Res_i];
                                         Y = [traces(tmp-Nlin : tmp-1, Ntraces).Center];
                                         xi = traces(tmp, Ntraces).Res_i;
@@ -558,7 +514,7 @@ for i = 1:Nstep-2
                                     temp_trace(temp_length).Clutter    = isClutter;
                                     %temp_lengs(temp_length)            = Results(i2).Widths(k2);
 
-                                    if (i2 >= length(Results)-3), % Что бы не вылететь за пределы спектрограммы 
+                                    if (i2 >= length(Results)-3) % Что бы не вылететь за пределы спектрограммы 
                                         ShowMeTheTrace(Results,traces,Ntraces);
                                         break; 
                                     end
@@ -685,7 +641,7 @@ end
 
 % ---- Только для Матлаба - выводим результат распознавания --------------
 Types = {'Non-radar signal','Iskra','MultaNova','Multa-CD',...
-    'MultaNova6F','Ramera-222','Stalker 34G'};
+    'MultaNova6F','Ramera-222','Stalker 34G', 'Gatso RT3'};
 fprintf(1,'===== Final Result ====================================\n');
 
 fprintf(1,'Traces detected: %g\n', Ntraces);
@@ -705,24 +661,25 @@ end
 
 % ---- Собственно распознавание и вывод результатов ----------------------
 if (Ntraces == 1)
-    if (TracksInfo(1).dFmax < 10)
-        % Что-то узкополосное (возможно "Мультанова 6F", но увы)
-        Type_of_radar = 'Unclassified';
-        Prob_of_recogn = 0.0;
-    else
-        if (TracksInfo(1).isBreak == 1)
-            Type_of_radar = 'Ramera-222';
-            Prob_of_recogn = TracksInfo(n_trk).dFmax/(Nwindow/8);
+        if (TracksInfo(1).dFmax < 10)
+            % Что-то узкополосное (возможно "Мультанова 6F", но увы)
+            Type_of_radar = 'Unclassified';
+            Prob_of_recogn = 0.0;
         else
-            if (TracksInfo(1).dFmax > 200)
+            % Широкополосные Радары
+            if (TracksInfo(1).isBreak == 1)
                 Type_of_radar = 'Ramera-222';
-                Prob_of_recogn = 1-1/(TracksInfo(1).dFmax/25);
+                Prob_of_recogn = TracksInfo(n_trk).dFmax/(Nwindow/8);
             else
-                Type_of_radar = 'Unclassified';
-                Prob_of_recogn = 0.0;
+                if (TracksInfo(1).dFmax > 240)
+                    Type_of_radar = 'Gatso RT3';
+                    Prob_of_recogn = 1-1/(TracksInfo(1).dFmax/25);
+                else
+                    Type_of_radar = 'Unclassified';
+                    Prob_of_recogn = 0.0;
+                end
             end
         end
-    end
 else
     % Если треков больше, то главный вопрос насколько они перекрываются
     if (IntersectEnough(traces(:,1:Ntraces),Lengths))
