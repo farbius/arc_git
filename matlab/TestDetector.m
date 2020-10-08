@@ -8,7 +8,7 @@ close all
 ONE_SPECTRUM   =  0;
 FULL_BANDWIDTH =  0;
 ADD_ADC_RAW    =  0;
-INPUT_GEN      =  0;
+INPUT_GEN      =  1;
 
 LOAD_MAT       =  1;
 
@@ -107,17 +107,18 @@ else % INPUT_GEN
 %%
 % signal generator
 
-    tau     = 245.76e-6;%245.76e-6;   % period
-    F2      = 237e6; % 237e6;    % start frequency
-    F1      = 73.275e6;     % stop frequency 
-    dev     = F2 - F1
+    tau     = 100e-6;   % 245.76e-6;   % period
+    F2      = 100.0e6;   % 237e6;    % start frequency
+    F1      = 50e6;     % stop frequency 
+    dev     = F2 - F1;
     Ns      = ceil(tau*Fs);
     ts      = (0:Ns-1)./Fs;
     
 % quadratic linear
     s       = chirp(ts,F1,tau,F2,'linear'); % convex concave ,[],'concave'       
     s       = repmat(s, [1 10]);
-   
+    Ns      = length(s);
+    s       = s(200000 : Ns);
 %     snr = -20;
 %     snr = 10^(-snr/20);
 %       n = randn(length(s),1);
@@ -160,7 +161,7 @@ Results = repmat(Results, Nstep, 1);
 % %trh = graythresh(abs(Y(:,:)));
 % fprintf(1,'Current trh = %g\n', trh);
 
-trh =2;
+trh =200;
 
 Centras = zeros(Nstep, 1);
 %% ==== Плисовская + I часть проц. алг-ма (первичная обработка) ==========
@@ -279,7 +280,7 @@ for k = 0:Nstep-1 %
 end
 
 save('centr.mat', 'Centras')
-
+return
 % ---- Проверка на заниженный порог --------------------------------------
 tmp = mean([Results(:).Num]); % Среднее число отдельных отметок
 if (tmp > MaxMeanPlts)
@@ -540,7 +541,7 @@ for i = 1:Nstep-2
                         %temp_lengs(temp_length)              = Results(i2).Widths(k2);
                         temp_trace(temp_length).Center     = Results(i2).Centers(k2); % И тут тоже!
                         
-                        if (i2 >= length(Results)-2),
+                        if (i2 >= length(Results)-2)
                             % ВрЕменной трассе не повезло - спектрограмма
                             % кончилась
                             Results = SetWholeTraceTo(Results,temp_trace,temp_length,-1);
@@ -610,7 +611,7 @@ for n_trk = 1:Ntraces
     end
     
     % Проверка на Сталкер - единственный пока в базе ШП-радар
-    if (mean(wtdhs)/length(wtdhs) > 0.5),
+    if (mean(wtdhs)/length(wtdhs) > 0.5)
         fprintf(1,'===== Final Result ====================================\n');
         fprintf(1,'Most probable radar: %s\n', 'Stalker 34G');
         fprintf(1,'With probability: %g%%\n', mean(wtdhs)/length(wtdhs));
